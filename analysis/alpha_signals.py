@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
-from analysis.forecasting import build_signals, FORECAST_HORIZON
+from analysis.forecasting import build_signals, forward_return, FORECAST_HORIZON
  
  
 # IC > 0.05 is generally considered useful in practice
@@ -48,22 +48,19 @@ def signal_decay(predictions, actuals, horizons=None):
     return pd.Series(results, name='Signal Decay by Horizon')
  
  
-def ic_summary(predictions, actuals):
-    # full evaluation of a signal — IC, t-stat, and decay
+def ic_summary(predictions, actuals, overlap=1):
+    # rank correlation between a signal and the forward return
+    # forward windows overlap, so the t-stat counts roughly one observation per window
     ic = information_coefficient(predictions, actuals)
- 
-    # t-stat for IC significance
-    n = len(predictions)
-    t_stat = ic * np.sqrt(n) / np.sqrt(1 - ic**2) if abs(ic) < 1 else np.nan
- 
+    n_eff = len(predictions) / overlap
+    t_stat = ic * np.sqrt(n_eff) / np.sqrt(1 - ic**2) if abs(ic) < 1 else np.nan
     decay = signal_decay(predictions, actuals)
- 
+
     return {
-        'IC':            round(ic, 4),
-        'IC T-Stat':     round(t_stat, 3),
-        'Significant':   abs(t_stat) > 1.96 if not np.isnan(t_stat) else False,
-        'IC Annualized': round(ic * np.sqrt(252), 4),
-        'Signal Decay':  decay.to_dict()
+        'IC':           round(ic, 4),
+        'IC T-Stat':    round(t_stat, 3),
+        'Significant':  abs(t_stat) > 1.96 if not np.isnan(t_stat) else False,
+        'Signal Decay': decay.to_dict()
     }
  
  
@@ -72,7 +69,7 @@ def evaluate_all_signals(returns, vix):
     # shows which signals actually have predictive power
     signals = build_signals(returns, vix)
     pf_ret = returns.mean(axis=1)
-    target = pf_ret.shift(-FORECAST_HORIZON).reindex(signals.index).dropna()
+    target = forward_return(pf_ret).reindex(signals.index).dropna()
     signals_aligned = signals.reindex(target.index)
  
     results = {}
@@ -86,7 +83,8 @@ def evaluate_all_signals(returns, vix):
  
         results[signal_name] = ic_summary(
             sig.loc[common].values,
-            tgt.loc[common].values
+            tgt.loc[common].values,
+            overlap=FORECAST_HORIZON
         )
  
     return pd.DataFrame(results).T

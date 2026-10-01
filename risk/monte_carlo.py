@@ -3,24 +3,16 @@ import pandas as pd
 from core.portfolio import portfolio_returns
  
  
-def cholesky_simulate(weights, returns, n_sims=10000, horizon=21):
-    # simulating assets independently loses correlation structure
-    # cholesky preserves it — matters a lot for tail risk estimates
-    cov = returns.cov().values
-    chol = np.linalg.cholesky(cov)
-    n_assets = len(weights)
-    w = np.array(weights)
- 
-    sim_outcomes = np.empty(n_sims)
- 
-    for i in range(n_sims):
-        shocks = np.random.standard_normal((n_assets, horizon))
-        corr_shocks = chol @ shocks        # shape: (n_assets, horizon)
-        asset_ret = corr_shocks.T          # (horizon, n_assets)
-        pf_daily = asset_ret @ w
-        sim_outcomes[i] = (1 + pf_daily).prod() - 1
- 
-    return sim_outcomes
+def cholesky_simulate(weights, returns, n_sims=10000, horizon=21, seed=42):
+   # correlated gaussian draws via cholesky, drift from the sample mean
+   # tails are thinner than the real data (excess kurtosis is about 15)
+    rng = np.random.default_rng(seed)
+    mu = returns.mean().values
+    chol = np.linalg.cholesky(returns.cov().values)
+    z = rng.standard_normal((n_sims, horizon, len(weights)))
+    asset_ret = z @ chol.T + mu
+    pf_daily = asset_ret @ np.asarray(weights)
+    return (1 + pf_daily).prod(axis=1) - 1
  
  
 def simulation_summary(weights, returns, n_sims=10000, horizon=21):
@@ -39,14 +31,15 @@ def simulation_summary(weights, returns, n_sims=10000, horizon=21):
  
  
 def regime_conditional_simulations(weights, returns, labeled_regimes):
-    # aggregate VaR hides regime-specific tail risk
-    # a portfolio can look fine overall and bleed badly in bear markets
+    # aggregate VaR hides regime specific tail risk
+    # a portfolio can look fine overall and lose much more in one regime
     results = {}
     for regime in labeled_regimes.unique():
         regime_dates = labeled_regimes[labeled_regimes == regime].index
         r_subset = returns.reindex(regime_dates).dropna()
  
         if len(r_subset) < 63:
+            print(f" skipping {regime}: only {len(r_subset)} days") 
             continue
  
         sims = cholesky_simulate(weights, r_subset)

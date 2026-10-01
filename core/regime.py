@@ -4,15 +4,7 @@ from hmmlearn import hmm
  
 N_REGIMES = 4
  
-# labels get assigned after fitting based on avg return of each state
-# hardcoding labels before fitting is wrong — the model decides
-# which state is which, not us
-REGIME_NAMES = {
-    0: 'Bull',
-    1: 'Recovery',
-    2: 'High Volatility',
-    3: 'Bear'
-}
+
  
  
 def build_features(spy_ret, vix, tny=None):
@@ -28,7 +20,7 @@ def build_features(spy_ret, vix, tny=None):
     })
  
     if tny is not None:
-        features['yield_chg'] = tny.reindex(spy_ret.index).ffill().pct_change()
+        features['yield_chg'] = tny.reindex(spy_ret.index).ffill().diff()
  
     return features.dropna()
  
@@ -46,8 +38,8 @@ def fit_hmm(features):
  
  
 def label_states(model, features):
-    # sort states by mean return — highest is bull, lowest is bear
-    # middle two split by volatility
+    # top 2 states by avg return: higher is Bull, lower is Recovery
+    # bottom 2: higher vol is High Volatility, lower vol is Choppy
     states = model.predict(features.values)
     state_series = pd.Series(states, index=features.index)
  
@@ -72,7 +64,7 @@ def label_states(model, features):
         bull:     'Bull',
         recovery: 'Recovery',
         high_vol: 'High Volatility',
-        bear:     'Bear'
+        bear:     'Choppy'
     }
  
     labeled = state_series.map(regime_map)

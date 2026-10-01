@@ -1,10 +1,9 @@
 import numpy as np
 import pandas as pd
 from core.portfolio import portfolio_returns
+from analysis.fixed_income import price_change, TLT_DURATION, TLT_CONVEXITY
  
-HISTORICAL_CRISES = {
-    'GFC 2008':          ('2008-09-01', '2009-03-31'),
-    'Euro Debt 2011':    ('2011-07-01', '2011-10-31'),
+HISTORICAL_CRISES = { 
     'China Selloff 2015':('2015-06-01', '2015-09-30'),
     'COVID Crash 2020':  ('2020-02-19', '2020-03-23'),
     'Rate Shock 2022':   ('2022-01-01', '2022-10-31'),
@@ -12,12 +11,13 @@ HISTORICAL_CRISES = {
 }
  
 # SVB included because it was a credit contagion event not just
-# a market selloff — different risk mechanism than the others
+# a market selloff different risk mechanism than the others
  
 HYPOTHETICAL_SHOCKS = {
     'Rates +300bps': {
         'VTV': -0.08, 'IWM': -0.10, 'QUAL': -0.06,
-        'USMV': -0.06, 'TLT': -0.28, 'TIP': -0.10, 'GLD': -0.05
+        'USMV': -0.06, 'TLT': price_change(TLT_DURATION, TLT_CONVEXITY, 300),
+        'TIP': -0.10, 'GLD': -0.05
     },
     'Equity -40%': {
         'VTV': -0.40, 'IWM': -0.45, 'QUAL': -0.30,
@@ -51,7 +51,7 @@ def historical_stress(prices, weights, crises=None):
             ret = period.pct_change().dropna()
             pf = portfolio_returns(weights, ret)
             results[name] = {
-                'Total Return': round(pf.sum(), 4),
+                'Total Return': round((1 + pf).prod() - 1, 4),
                 'Worst Day':    round(pf.min(), 4),
                 'Realized Vol': round(pf.std() * np.sqrt(252), 4),
                 'Days':         len(ret)
