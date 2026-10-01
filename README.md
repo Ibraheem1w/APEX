@@ -1,147 +1,58 @@
 # APEX
-## Adaptive Portfolio Exposure and Risk Engine
 
-Most portfolio risk models treat markets as if they're always the same. They're not. A VaR calculated during a bull market is almost meaningless during a crisis because correlations, volatility, and return dynamics are completely different. APEX built around that problem — detect the current regime first, then run everything else conditional on it.
+Adaptive Portfolio Exposure and Risk Engine
 
----
+APEX is a risk project on a portfolio of 7 ETFs. The question behind it is simple. Do the risk numbers for the same portfolio change depending on the kind of market you are in? In this data they do.
 
 ## Portfolio
 
-| Ticker | Asset | Role |
-|--------|-------|------|
-| VTV | Vanguard Value ETF | recovery_leader |
-| IWM | iShares Russell 2000 | growth_amplifier |
-| QUAL | iShares MSCI Quality | downturn_anchor |
-| USMV | iShares Min Volatility | bear_defensive |
-| TLT | iShares 20yr Treasury | recession_hedge |
-| TIP | iShares TIPS | inflation_shield |
-| GLD | SPDR Gold | stagflation_store |
+VTV (US value stocks), IWM (US small caps), QUAL (US quality stocks), USMV (US low volatility stocks), TLT (long term Treasuries), TIP (inflation protected Treasuries), and GLD (gold).
 
-Factor ETFs not individual stocks. Each one is in there because it does something specific in a specific economic environment — not because of views on any particular company.
+The data is daily prices from Yahoo Finance from July 2013 to December 2024, which is 2,882 trading days. It starts in 2013 because that is when QUAL launched.
 
----
+## What it does
 
-## Modules
+The core folder finds market regimes with a four state hidden Markov model built on SPY returns, volatility, the VIX, and changes in the 10 year yield. The states are named after the model is fit, based on their average return and volatility: Bull, Recovery, Choppy, and High Volatility. The same folder builds a max Sharpe portfolio, with each asset between 5% and 35%, and a risk parity portfolio, both using Ledoit Wolf covariance.
 
-**core/regime.py**
-4-state Hidden Markov Model on SPY returns, realized vol, and VIX. The model decides which state is which after fitting — you can't hardcode labels before you know what the data looks like. Current regime as of last run: Recovery.
+The risk folder covers historical and parametric VaR, CVaR, a Monte Carlo simulation with 10,000 paths over 21 days, crisis correlations, and a correlation network.
 
-Transition matrix persistence:
-- Bull stays Bull 97.4% of days (~38 day average duration)
-- Bear stays Bear 97.2% of days (~35 day average)
-- High Volatility only persists 88.8% — these regimes are short and violent
+The analysis folder has stress tests on 4 real crises and 5 made up scenarios, a Fama French five factor regression with a return breakdown, 8 momentum, volatility, and VIX signals, a Ridge forecast, and a FinBERT sentiment pipeline.
 
-**core/optimize.py**
-Max Sharpe with Ledoit-Wolf shrinkage vs Risk Parity. With 7 assets and a few hundred observations sample covariance is noisy — small changes in the date range produce very different weights. Ledoit-Wolf fixes that. Risk Parity is included because max Sharpe tends to overweight whatever had the highest recent Sharpe, which isn't always what you want.
+The credit folder works through counterparty exposure, CVA, margin math, and a simple scorecard for a sample leveraged fund.
 
-**risk/risk_metrics.py**
-VaR, CVaR, parametric VaR, rolling correlations, crisis correlation shift. The crisis correlation analysis is the most interesting output — average pairwise correlation in normal markets was 0.2903, jumped to 0.4133 during the 2022 rate shock. That's the diversification breakdown most frameworks miss because they use unconditional full-sample correlations.
+## Results
 
-**risk/monte_carlo.py**
-10,000 path simulation using Cholesky decomposition. Simulating assets independently would lose the correlation structure entirely — Cholesky preserves it. Run both unconditionally and conditional on each regime.
+The max Sharpe portfolio holds 35% QUAL, 29% GLD, 16% USMV, and 5% in each of the other four. It returned 10.0% a year with 10.9% volatility, a Sharpe ratio of 0.79 using a 1.48% risk free rate, and a worst drawdown of 22.4%.
 
-**core/portfolio.py**
-Standard metrics plus Information Ratio and regime-conditional stats. The regime breakdown is where it gets interesting:
-- Bull: Sharpe 1.626
-- Recovery: Sharpe 1.006
-- High Volatility: Sharpe -0.245
-- Bear: Sharpe -0.030
+By regime, the Sharpe ratio was 1.85 in Bull (1,061 days), 1.21 in Recovery (848 days), and 0.29 in Choppy (924 days). The one month VaR at 95% was a 1.7% loss in Bull, 2.9% in Recovery, and 5.6% in Choppy, so the same portfolio carries about three times the risk in a Choppy market. High Volatility caught 18 of the 24 COVID crash days but only has 49 days in total, so it is too short to simulate.
 
-Unconditional Sharpe of 0.473 hides all of that.
+In the stress tests the portfolio lost 22.4% in COVID, 15.0% in the 2022 rate shock, and 5.3% in the 2015 China selloff, and it gained 4.6% during SVB. In the made up scenarios it lost 7.6% if rates rise 3 points, 14.2% if stocks fall 40%, and 19.2% in a liquidity freeze.
 
-**analysis/factors.py**
-Fama-French 5-factor regression with manual OLS — scikit-learn doesn't return standard errors so this is written from scratch. 5-factor not 3-factor because RMW directly captures QUAL's profitability tilt. Using 3-factor would dump that exposure into alpha.
+Average correlation between the assets was 0.29 over the full period and rose to 0.41 in 2022, when stocks and bonds fell together. It was lower during COVID (0.24) and SVB (close to zero), likely because bonds and gold moved against stocks.
 
-From actual data:
-- R-squared: 0.9019
-- Annualized alpha: 39.1 bps, t-stat 0.35 — not significant
-- Market beta: 0.668
-- RMW and CMA both significant at 1% level
+The five factor model explains 79% of daily returns, with a market beta of 0.57. Of the 10.0% yearly return, about 7.2% comes from the market and 1.5% from the risk free rate. Alpha is 1.2% a year but not statistically significant (p = 0.42), and since the factors only cover stocks, some of that is really bond and gold returns.
 
-**analysis/behavior.py**
-Win rate, profit factor, edge ratio, expectancy per trade. Built this because raw returns don't tell you how a strategy is actually working. A 60% win rate with losers twice the size of winners has negative expectancy. A 40% win rate with winners three times the size of losers prints money.
+None of the 8 signals is significant once overlapping 21 day windows are taken into account, and the Ridge forecast does slightly worse than guessing the average (error of 0.0306 against 0.0283).
 
-From actual data:
-- Win Rate: 54.7%
-- Avg Winner: +0.492%, Avg Loser: -0.502%
-- Profit Factor: 1.186
-- Edge Ratio: 0.98
-- Expectancy per Trade: 0.0419%
+## Running it
 
-Edge ratio under 1.0 — the win rate is doing the work here, not the size of winners.
+    python -m venv .venv
+    source .venv/bin/activate
+    pip install numpy pandas scipy scikit-learn yfinance hmmlearn pandas-datareader transformers torch
+    python main.py
 
-**analysis/attribution.py**
-Brinson-Hood-Beebower model plus factor-based decomposition. Two strategies with identical 12% annual returns can get there completely differently — one through genuine selection, one through factor loading that happened to work that year. Attribution separates those cases.
+It needs an internet connection for Yahoo Finance, the Fama French data, and the FinBERT model.
 
-From actual data:
-- Stock Selection (Alpha): 0.00391
-- Market contribution: 0.03342
-- Total Attributed: 0.04592
+## Limits
 
-**analysis/alpha_signals.py**
-Information Coefficient across all 8 forecasting signals. IC is rank correlation between predicted and actual returns — more appropriate here than Pearson because returns aren't normally distributed.
+Everything is in sample. The weights, regimes, and stress tests all use the same 2013 to 2024 data.
 
-Only two signals statistically significant:
-- reversal_1w: IC 0.0415, t-stat 2.12
-- vix_chg_5d: IC 0.0435, t-stat 2.23
+The regime model labels each day using the whole period, so it is not a real time signal. The current regime of Recovery is as of December 30, 2024.
 
-Momentum signals were negative IC. Factor ETFs apparently mean-revert rather than trend — makes sense given how they rebalance.
+The Monte Carlo assumes normal returns, so it understates how bad the worst days get. Its worst simulated month was a 10.5% loss, while the real worst drawdown was 22.4%.
 
-**analysis/sentiment.py**
-FinBERT on financial news headlines. Used FinBERT specifically because financial language is different enough from general text that VADER and TextBlob consistently underperform on things like earnings calls and Fed statements. Output feeds into forecasting as a 9th signal.
+The made up scenarios, the sample fund, and the CVA inputs (45% loss given default and a 2% default probability) are assumptions, not estimates.
 
-**analysis/forecasting.py**
-Ridge regression on 8 signals. Ridge not OLS because 1-month and 3-month momentum share variance — OLS inflates them in opposite directions. Walk-forward TimeSeriesSplit, not random splits, because random splits let future data contaminate training.
+The sentiment step runs on 8 sample headlines. It shows the pipeline works but is not a trading signal.
 
-**analysis/fixed_income.py**
-Macaulay duration, modified duration, convexity, DV01 for TLT. Added convexity specifically because 2022 was a +300bps move — at that scale duration alone meaningfully underestimates price changes.
-
-**analysis/stress_testing.py**
-Historical scenarios across China Selloff 2015, COVID Crash 2020, Rate Shock 2022, SVB 2023. GFC 2008 and Euro Debt 2011 fall outside the data range. SVB included because it was a credit contagion event not just a market selloff — different risk mechanism than the others.
-
-**credit/counterparty.py**
-PFE, EPE, CVA using Basel III framework. CVA became mandatory post-2008 — before that most banks didn't price counterparty default risk at all, which is part of why the losses were so large.
-
-**risk/propagation.py**
-Correlation network and minimum spanning tree using Mantegna (1999) distance metric. Pairwise correlations don't tell you how shocks actually travel — the MST shows the load-bearing connections and which assets are structural hubs.
-
----
-
-## Setup
-
-```bash
-pip install yfinance pandas numpy scipy scikit-learn hmmlearn pandas-datareader plotly statsmodels matplotlib transformers torch
-```
-
-```bash
-python main.py
-```
-
----
-
-## Structure
-
-```
-APEX/
-├── main.py
-├── data.py
-├── core/
-│   ├── portfolio.py
-│   ├── optimize.py
-│   └── regime.py
-├── risk/
-│   ├── risk_metrics.py
-│   ├── monte_carlo.py
-│   └── propagation.py
-├── analysis/
-│   ├── stress_testing.py
-│   ├── factors.py
-│   ├── forecasting.py
-│   ├── fixed_income.py
-│   ├── alpha_signals.py
-│   ├── sentiment.py
-│   ├── behavior.py
-│   └── attribution.py
-└── credit/
-    └── counterparty.py
-```
+fast_stats.cpp is a separate C++ standard deviation program and is not used by the Python code.
