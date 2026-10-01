@@ -1,4 +1,4 @@
-# APEX — Adaptive Portfolio Exposure and Risk Engine
+# APEX Adaptive Portfolio Exposure and Risk Engine
 #
 # core idea: unconditional risk metrics lie.
 # a portfolio's VaR in a bull market tells you nothing
@@ -7,7 +7,6 @@
 # actually changes the numbers meaningfully. it does.
 
 import numpy as np
-import pandas as pd
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -15,7 +14,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
 
 from data import fetch_assets, fetch_macro
-from core.portfolio import full_scorecard, regime_conditional_stats, max_drawdown
+from core.portfolio import full_scorecard, regime_conditional_stats, max_drawdown, RF_RATE
 from core.optimize import max_sharpe, risk_parity, compare_allocations, robust_cov
 from core.regime import run_regime_analysis
 from risk.risk_metrics import full_risk_report, crisis_correlation_shift
@@ -23,13 +22,13 @@ from risk.monte_carlo import simulation_summary, regime_conditional_simulations
 from risk.propagation import full_shock_matrix, minimum_spanning_tree
 from analysis.stress_testing import historical_stress, hypothetical_stress
 from analysis.factors import fetch_ff5, run_factor_model, alpha_decomposition
-from analysis.forecasting import train as train_forecast, forecast, signal_importance
-from analysis.alpha_signals import evaluate_all_signals, ic_summary
-from analysis.sentiment import sentiment_signal
+from analysis.forecasting import train as train_forecast
+from analysis.alpha_signals import evaluate_all_signals
 from analysis.behavior import behavior_report
 from analysis.attribution import simple_attribution
-from analysis.fixed_income import tlt_rate_sensitivity
 from credit.counterparty import full_counterparty_report
+from analysis.sentiment import sentiment_signal
+
 
 
 def run():
@@ -52,23 +51,37 @@ def run():
     print("\nregime persistence (avg days):")
     print(regime_out['persistence'].to_string())
 
+
+
+    print("\nfetching risk-free rate...")
+    ff5 = None
+    rf = RF_RATE
+    try:
+        start_str = returns_aligned.index[0].strftime('%Y-%m-%d')
+        end_str   = returns_aligned.index[-1].strftime('%Y-%m-%d')
+        ff5 = fetch_ff5(start_str, end_str)
+        rf = float(ff5['RF'].reindex(returns_aligned.index).mean() * 252)
+    except Exception as e:
+        print(f"factor data unavailable, using default rf: {e}")
+    print(f"risk-free rate used: {rf:.4f}")
+
     print("\noptimizing weights...")
     cov = robust_cov(returns_aligned)
-    ms_weights = max_sharpe(returns_aligned).values
-    rp_weights = risk_parity(returns_aligned).values
+    ms_weights = max_sharpe(returns_aligned, rf=rf).values
+    
 
     print("\nmax sharpe vs risk parity:")
-    print(compare_allocations(returns_aligned).to_string())
+    print(compare_allocations(returns_aligned, rf=rf).to_string())
 
     print("\nportfolio scorecard:")
-    scorecard = full_scorecard(ms_weights, returns_aligned, cov.values)
+    scorecard = full_scorecard(ms_weights, returns_aligned, cov.values, rf=rf)
     print(scorecard.to_string())
 
     print("\nperformance by regime:")
     regime_stats = regime_conditional_stats(
         ms_weights, returns_aligned,
-        regime_out['states'],
-        regime_out['regime_map']
+        regime_out['labeled'], rf=rf
+        
     )
     print(regime_stats.to_string())
 
@@ -84,6 +97,13 @@ def run():
     mc = simulation_summary(ms_weights, returns_aligned)
     for k, v in mc.items():
         print(f"  {k}: {v}")
+
+    print("\nregime-conditional monte carlo...")
+    rc_mc = regime_conditional_simulations(
+        ms_weights, returns_aligned, regime_out['labeled']
+    )
+    print(rc_mc.to_string())
+    
 
     print("\nstress testing...")
     hist_stress = historical_stress(prices, ms_weights)
@@ -101,11 +121,12 @@ def run():
     # store ff_results at outer scope so attribution can use it
     ff_results = None
 
+        
+
     print("\nfactor attribution...")
     try:
-        start_str = returns_aligned.index[0].strftime('%Y-%m-%d')
-        end_str   = returns_aligned.index[-1].strftime('%Y-%m-%d')
-        ff5 = fetch_ff5(start_str, end_str)
+        if ff5 is None:
+            raise ValueError("FF5 data not loaded")
         pf_ret = returns_aligned.dot(ms_weights)
         ff_results, r2, adj_r2 = run_factor_model(pf_ret, ff5)
         alpha = alpha_decomposition(pf_ret, ff5)
@@ -117,7 +138,7 @@ def run():
     except Exception as e:
         print(f"factor data unavailable: {e}")
 
-    print("\nPM behavior analytics...")
+    print("\ndaily return profile...")
     try:
         pf_ret_behavior = returns_aligned.dot(ms_weights)
         report = behavior_report(pf_ret_behavior)
@@ -128,7 +149,7 @@ def run():
     print("\nreturn attribution...")
     try:
         if ff_results is not None:
-            attr = simple_attribution(ms_weights, returns_aligned, ff_results)
+            attr = simple_attribution(ms_weights, returns_aligned, ff_results, ff5)
             print(attr.to_string())
         else:
             print("attribution unavailable: factor model unavailable")
@@ -142,6 +163,14 @@ def run():
     except Exception as e:
         print(f"alpha signal evaluation unavailable: {e}")
 
+    print("\nforecast model check...")
+    try:
+        trained = train_forecast(returns_aligned, vix_aligned)
+        print(f"  cv_rmse:   {trained['cv_rmse']}")
+        print(f"  base_rmse: {trained['base_rmse']}")
+    except Exception as e:
+        print(f"forecast unavailable: {e}")
+
     print("\nsentiment analysis...")
     try:
         sentiment_summary, sentiment_scores = sentiment_signal()
@@ -153,7 +182,7 @@ def run():
     print("\ncounterparty credit assessment...")
     pf_ret = returns_aligned.dot(ms_weights)
     sample_fund = {
-        'sharpe':   round((pf_ret.mean()*252 - 0.05) /
+        'sharpe':   round((pf_ret.mean()*252 - rf) /
                           (pf_ret.std()*np.sqrt(252)), 2),
         'max_dd':   max_drawdown(pf_ret),
         'leverage': 2.5,

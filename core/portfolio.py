@@ -34,7 +34,7 @@ def sharpe(weights, returns, cov_matrix, rf=RF_RATE):
  
 def information_ratio(pf_returns, benchmark_returns):
     # active return / tracking error
-    # Sharpe ignores the benchmark — IR doesn't
+    # Sharpe ignores the benchmark IR doesn't
     active = pf_returns - benchmark_returns
     te = _annualize(active.std(), square_root=True)
     active_ann = _annualize(active.mean())
@@ -55,15 +55,16 @@ def calmar(weights, returns):
     return ann_ret / abs(mdd)
  
  
-def regime_conditional_stats(weights, returns, states, regime_map):
-    # unconditional Sharpe hides regime-specific bleed
+def regime_conditional_stats(weights, returns, labeled, rf=RF_RATE ):
+    # unconditional Sharpe hides regime specific bleed
     # a strategy can look fine overall and lose badly in bear markets
     pf = portfolio_returns(weights, returns)
+    labels = labeled.reindex(pf.index)
     out = {}
  
-    for state_id, label in regime_map.items():
-        mask = states == state_id
-        r = pf[mask]
+    for label in labels.dropna().unique():
+        r = pf[labels == label]
+        
  
         if len(r) < 21:
             continue
@@ -74,15 +75,15 @@ def regime_conditional_stats(weights, returns, states, regime_map):
         out[label] = {
             'Ann Return':   round(ann_ret, 4),
             'Volatility':   round(vol, 4),
-            'Sharpe':       round((ann_ret - RF_RATE) / vol, 3) if vol > 0 else np.nan,
+            'Sharpe':       round((ann_ret - rf) / vol, 3) if vol > 0 else np.nan,
             'Max Drawdown': round(max_drawdown(r), 4),
-            'Obs':          int(mask.sum())
+            'Obs':          int(len(r))
         }
  
     return pd.DataFrame(out).T
  
  
-def full_scorecard(weights, returns, cov_matrix, benchmark_returns=None):
+def full_scorecard(weights, returns, cov_matrix, benchmark_returns=None, rf=RF_RATE):
     pf = portfolio_returns(weights, returns)
     ann_ret = _annualize(pf.mean())
     vol = annualized_vol(weights, cov_matrix)
@@ -90,7 +91,7 @@ def full_scorecard(weights, returns, cov_matrix, benchmark_returns=None):
     result = {
         'Annualized Return': round(ann_ret, 4),
         'Annualized Vol':    round(vol, 4),
-        'Sharpe Ratio':      round(sharpe(weights, returns, cov_matrix), 3),
+        'Sharpe Ratio':      round(sharpe(weights, returns, cov_matrix, rf), 3),
         'Max Drawdown':      round(max_drawdown(pf), 4),
         'Calmar Ratio':      round(calmar(weights, returns), 3),
         'Skewness':          round(pf.skew(), 3),

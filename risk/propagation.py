@@ -1,9 +1,7 @@
 import numpy as np
 import pandas as pd
  
-# TODO: add networkx visualization for the dashboard
-# keeping computation separate from rendering for now
- 
+
  
 def correlation_network(returns, threshold=0.3):
     # assets as nodes, strong correlations as edges
@@ -26,7 +24,7 @@ def correlation_network(returns, threshold=0.3):
  
  
 def minimum_spanning_tree(returns):
-    # finds the load-bearing correlations in the portfolio
+    # finds the load bearing correlations in the portfolio
     # based on Mantegna (1999) financial network methodology
     corr = returns.corr()
     dist = np.sqrt(2 * (1 - corr))   # distance metric from correlations

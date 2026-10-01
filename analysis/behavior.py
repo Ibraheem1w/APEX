@@ -32,7 +32,7 @@ def profit_factor(trade_returns):
  
  
 def edge_ratio(trade_returns):
-    # avg winner / avg loser — tells you if wins are big enough
+    # avg winner / avg loser tells you if wins are big enough
     # a 40% win rate with edge ratio of 3.0 beats
     # a 60% win rate with edge ratio of 0.8
     aw = avg_winner(trade_returns)
@@ -41,7 +41,7 @@ def edge_ratio(trade_returns):
  
  
 def expectancy(trade_returns):
-    # expected return per trade — the number that actually matters
+    # expected return per trade the number that actually matters
     # positive expectancy = viable strategy regardless of win rate
     wr = win_rate(trade_returns)
     aw = avg_winner(trade_returns)
@@ -58,7 +58,7 @@ def position_sizing_discipline(position_sizes):
  
  
 def concentration_score(weights):
-    # herfindahl index — standard concentration measure
+    # herfindahl index standard concentration measure
     # 1.0 = fully concentrated, 1/n = equal weight
     w = np.array(weights)
     return round((w ** 2).sum(), 4)

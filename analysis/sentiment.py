@@ -1,17 +1,12 @@
 import numpy as np
 import pandas as pd
  
-# FinBERT is pretrained on financial text specifically
-# using a general sentiment model like VADER here would be wrong —
-# financial language is different enough that domain-specific models
-# consistently outperform general ones on earnings calls, news, filings
- 
+# using finbert because it's trained on financial text, vader misreads it
 # requires: pip install transformers torch
- 
  
 def load_finbert():
     from transformers import AutoTokenizer, AutoModelForSequenceClassification
-    import torch
+    
  
     model_name = "ProsusAI/finbert"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -36,12 +31,13 @@ def score_headline(headline, tokenizer, model):
  
     probs = torch.softmax(outputs.logits, dim=1).squeeze()
  
-    # finbert outputs: positive, negative, neutral
+    # read the label order from the model instead of assuming it
+    labels = {v.lower(): k for k, v in model.config.id2label.items()}
     positive = probs[0].item()
     negative = probs[1].item()
     neutral  = probs[2].item()
  
-    # net sentiment score: positive - negative, ranges -1 to 1
+     # net score is positive - negative, ranges -1 to 1
     net_score = positive - negative
  
     return {
@@ -53,14 +49,14 @@ def score_headline(headline, tokenizer, model):
  
  
 def score_headlines(headlines, tokenizer, model):
-    # batch scoring — faster than one at a time
+    # scores one headline at a time
     results = []
     for h in headlines:
         try:
             result = score_headline(h, tokenizer, model)
             results.append(result)
         except Exception:
-            # malformed headline — skip rather than crash
+     # bad headline, score as neutral instead of crashing
             results.append({'positive': 0, 'negative': 0,
                             'neutral': 1, 'score': 0})
     return pd.DataFrame(results)
@@ -83,14 +79,8 @@ def fetch_sample_headlines():
  
  
 def sentiment_signal(headlines=None):
-    """
-    Runs FinBERT on a list of financial headlines and returns
-    an aggregated sentiment score usable as a trading signal.
- 
-    Positive score = bullish sentiment
-    Negative score = bearish sentiment
-    Near zero = neutral / mixed
-    """
+    # finbert score averaged over headlines, positive = bullish, negative = bearish
+    # only runs on the 8 sample headlines above, so it's a pipeline demo, not a signal
     tokenizer, model = load_finbert()
  
     if headlines is None:

@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy import stats
-from core.portfolio import portfolio_returns, _annualize
+from core.portfolio import portfolio_returns
  
  
 def hist_var(pf_ret, confidence=0.95):
@@ -9,16 +9,14 @@ def hist_var(pf_ret, confidence=0.95):
  
  
 def cvar(pf_ret, confidence=0.95):
-    # VaR just tells you the threshold
-    # CVaR tells you the average of what's beyond it — more useful
-    # post-2008 most firms shifted to CVaR as the primary metric
+    # average loss on the days worse than the VaR threshold
     var = hist_var(pf_ret, confidence)
     tail = pf_ret[pf_ret <= var]
     return tail.mean()
  
  
 def parametric_var(pf_ret, confidence=0.95):
-    # assumes normality — compare against historical as sanity check
+    # assumes normality compare against historical as sanity check
     z = stats.norm.ppf(1 - confidence)
     return pf_ret.mean() + z * pf_ret.std()
  
@@ -34,8 +32,8 @@ def rolling_sharpe(pf_ret, window=63, rf=0.05):
  
  
 def rolling_correlations(returns, window=63):
-    # correlations spike during crises
-    # diversification collapses exactly when you need it most
+    # correlations move in stress, not always up
+    # in this sample 2022 rose a lot, COVID and SVB windows are short and noisy
     assets = returns.columns
     pairs = {}
     for i in range(len(assets)):
@@ -48,11 +46,8 @@ def rolling_correlations(returns, window=63):
  
  
 def crisis_correlation_shift(returns):
-    # quantifies how much diversification breaks down in crises
-    # most risk models don't surface this explicitly
+    # avg pairwise correlation inside each crisis window vs the full sample
     crises = {
-        'GFC 2008':        ('2008-09-01', '2009-03-31'),
-        'Euro Debt 2011':  ('2011-07-01', '2011-10-31'),
         'COVID 2020':      ('2020-02-19', '2020-03-23'),
         'Rate Shock 2022': ('2022-01-01', '2022-10-31'),
         'SVB 2023':        ('2023-03-08', '2023-03-31')
@@ -64,7 +59,7 @@ def crisis_correlation_shift(returns):
         return upper.mean()
  
     baseline = avg_pairwise(returns.corr())
-    results = {'Normal Markets': {'Avg Correlation': round(baseline, 4),
+    results = {'Full Sample': {'Avg Correlation': round(baseline, 4),
                                    'Period': 'Full sample'}}
  
     for label, (start, end) in crises.items():
@@ -75,7 +70,7 @@ def crisis_correlation_shift(returns):
             c_corr = avg_pairwise(c_ret.corr())
             results[label] = {
                 'Avg Correlation':  round(c_corr, 4),
-                'Change vs Normal': round(c_corr - baseline, 4),
+                'Change vs Full Sample': round(c_corr - baseline, 4),
                 'Period':           f"{start} → {end}"
             }
         except Exception:

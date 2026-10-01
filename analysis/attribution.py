@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
+from analysis.factors import FF5_FACTORS
  
-# two PMs can have identical returns via completely different routes
+# splits return into factor exposure and what's left over (alpha)
 # one through genuine stock selection, one through factor exposure
 # that happened to do well that year
 # attribution separates those two cases
@@ -11,7 +12,7 @@ def factor_attribution(portfolio_returns, factor_returns,
                         factor_exposures):
     # decompose returns into factor contributions
     # residual = what's left after factors = selection effect
-    # this is the number PCAT cares most about
+    
     factor_contrib = factor_exposures * factor_returns
     total_factor   = factor_contrib.sum()
     residual       = portfolio_returns - total_factor
@@ -29,11 +30,11 @@ def factor_attribution(portfolio_returns, factor_returns,
 def brinson_attribution(portfolio_weights, benchmark_weights,
                          portfolio_returns, benchmark_returns,
                          sector_map):
-    # brinson-hood-beebower model
+    # brinson hood beebower model
     # industry standard for decomposing active returns into:
-    # allocation effect — sector over/underweights
-    # selection effect — stock picking within sectors
-    # interaction — combination of both
+    # allocation effect sector over/underweights
+    # selection effect stock picking within sectors
+    # interaction combination of both
     sectors = sector_map.unique()
     results = []
  
@@ -74,7 +75,7 @@ def rolling_attribution(weights, returns, factor_returns,
                          factor_exposures, window=63):
     # tracks how attribution shifts over time
     # a PM whose alpha is shrinking while factor exposure grows
-    # is losing their edge — this surfaces that
+    # is losing their edge this surfaces that
     pf_returns = returns.dot(weights)
     results = []
  
@@ -94,20 +95,17 @@ def rolling_attribution(weights, returns, factor_returns,
     return pd.DataFrame(results).set_index('date')
  
  
-def simple_attribution(weights, returns, factor_model_results):
-    # quick version using existing FF5 output
-    # reframes what the factor regression already calculated
-    # no need to rebuild from scratch
-    total_return = returns.dot(weights).sum() * 252
-    contributions = {}
- 
-    for factor, row in factor_model_results.iterrows():
-        if factor == 'Alpha':
-            contributions['Stock Selection (Alpha)'] = round(
-                row['Coefficient'] * 252, 5
-            )
-        else:
-            contributions[factor] = round(row['Coefficient'] * 0.05, 5)
- 
-    contributions['Total Attributed'] = sum(contributions.values())
-    return pd.Series(contributions)
+def simple_attribution(weights, returns, ff_results, ff5):
+    # annualized return = risk-free + factor premia + alpha
+    # each factor contribution is beta * that factor's realized annualized return
+    pf = returns.dot(weights)
+    f = ff5.reindex(pf.index).dropna()
+
+    out = {'Risk-Free': f['RF'].mean() * 252}
+    for k in FF5_FACTORS:
+        out[k] = ff_results.loc[k, 'Coefficient'] * f[k].mean() * 252
+    out['Alpha'] = ff_results.loc['Alpha', 'Coefficient'] * 252
+    out['Total (sum)'] = sum(out.values())
+    out['Actual Return'] = pf.reindex(f.index).mean() * 252
+
+    return pd.Series(out).round(5)

@@ -14,7 +14,7 @@ REGIME_ROTATION_ASSETS = {
     'GLD':  'stagflation_store'
 }
  
-# Pulled separately — regime detection inputs, not portfolio assets
+# Pulled separately regime detection inputs, not portfolio assets
 MACRO_SIGNALS = ['^VIX', 'SPY', '^TNX']
  
  
