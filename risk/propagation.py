@@ -60,7 +60,7 @@ def minimum_spanning_tree(returns):
  
 def stress_transmission(returns, shock_asset, shock_size=-0.05):
     # if IWM drops 5% what does that do to everything else
-    # this is what credit risk teams run for concentrated hedge fund exposure
+    # a simple version of a shock propagation test
     corr = returns.corr()
     vols = returns.std() * np.sqrt(252)
  

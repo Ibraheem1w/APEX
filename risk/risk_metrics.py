@@ -16,7 +16,7 @@ def cvar(pf_ret, confidence=0.95):
  
  
 def parametric_var(pf_ret, confidence=0.95):
-    # assumes normality compare against historical as sanity check
+    # assumes normal returns, compare against historical as a sanity check
     z = stats.norm.ppf(1 - confidence)
     return pf_ret.mean() + z * pf_ret.std()
  
@@ -71,7 +71,7 @@ def crisis_correlation_shift(returns):
             results[label] = {
                 'Avg Correlation':  round(c_corr, 4),
                 'Change vs Full Sample': round(c_corr - baseline, 4),
-                'Period':           f"{start} → {end}"
+                'Period':           f"{start} to {end}"
             }
         except Exception:
             continue
