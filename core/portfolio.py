@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
  
 TRADING_DAYS = 252
-RF_RATE = 0.05   # update when environment changes
+RF_RATE = 0.05   # fallback, main.py uses the Fama French rate when it can download it
  
  
 def _annualize(daily_val, square_root=False):
@@ -34,7 +34,7 @@ def sharpe(weights, returns, cov_matrix, rf=RF_RATE):
  
 def information_ratio(pf_returns, benchmark_returns):
     # active return / tracking error
-    # Sharpe ignores the benchmark IR doesn't
+    # Sharpe ignores the benchmark, IR doesn't
     active = pf_returns - benchmark_returns
     te = _annualize(active.std(), square_root=True)
     active_ann = _annualize(active.mean())

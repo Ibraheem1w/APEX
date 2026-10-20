@@ -38,7 +38,7 @@ def max_sharpe(returns, rf=RF_RATE, max_weight=0.35, min_weight=0.05):
 def risk_parity(returns):
     # each asset contributes equally to total portfolio variance
     # mean-variance over-concentrates in high-vol assets
-    # risk parity sidesteps that conceptually close to Bridgewater All Weather
+    # risk parity avoids that, similar idea to Bridgewater All Weather
     cov = robust_cov(returns).values
     n = len(returns.columns)
     w0 = np.array([1/n] * n)
@@ -76,7 +76,7 @@ def efficient_frontier(returns, rf=RF_RATE, n_points=2000):
  
  
 def compare_allocations(returns, rf=RF_RATE):
-    # the disagreements between methods are often more interesting than the outputs
+    # puts the methods side by side to see where they disagree
     ms = max_sharpe(returns, rf=rf)
     rp = risk_parity(returns)
  

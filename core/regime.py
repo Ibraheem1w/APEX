@@ -72,7 +72,7 @@ def label_states(model, features):
  
  
 def transition_matrix(model, regime_map):
-    # P(Bull → Bull) = 0.97 means ~33 days average before switching
+    # P(stay in Bull) = 0.97 means ~33 days average before switching
     raw = pd.DataFrame(
         model.transmat_,
         index=range(N_REGIMES),
