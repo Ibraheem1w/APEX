@@ -10,8 +10,8 @@ HISTORICAL_CRISES = {
     'SVB Crisis 2023':   ('2023-03-08', '2023-03-31')
 }
  
-# SVB included because it was a credit contagion event not just
-# a market selloff different risk mechanism than the others
+# SVB is included because it was a bank and credit event, not just
+# a market selloff, so it tests a different kind of risk
  
 HYPOTHETICAL_SHOCKS = {
     'Rates +300bps': {

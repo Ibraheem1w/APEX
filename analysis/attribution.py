@@ -11,7 +11,7 @@ from analysis.factors import FF5_FACTORS
 def factor_attribution(portfolio_returns, factor_returns,
                         factor_exposures):
     # decompose returns into factor contributions
-    # residual = what's left after factors = selection effect
+    # residual is what's left after the factors, i.e. the selection effect
     
     factor_contrib = factor_exposures * factor_returns
     total_factor   = factor_contrib.sum()
@@ -31,10 +31,10 @@ def brinson_attribution(portfolio_weights, benchmark_weights,
                          portfolio_returns, benchmark_returns,
                          sector_map):
     # brinson hood beebower model
-    # industry standard for decomposing active returns into:
-    # allocation effect sector over/underweights
-    # selection effect stock picking within sectors
-    # interaction combination of both
+    # splits active return into:
+    # allocation: over/underweighting sectors
+    # selection: picking within sectors
+    # interaction: both together
     sectors = sector_map.unique()
     results = []
  

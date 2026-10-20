@@ -15,7 +15,7 @@ def forward_return(pf_ret, horizon=FORECAST_HORIZON):
  
 def build_signals(returns, vix):
     # momentum: Jegadeesh & Titman (1993)
-    # vix: fear gauge as a contrarian predictor
+    # vix: high fear as a contrarian signal
     pf_ret = returns.mean(axis=1)
  
     signals = pd.DataFrame({

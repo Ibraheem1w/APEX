@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
  
 # TLT approximate current characteristics
-# duration shifts with market update when rates move significantly
+# approximate, update if rates move a lot
 TLT_DURATION = 17.5
 TLT_CONVEXITY = 420
 TLT_TICKER = 'TLT'
@@ -21,13 +21,13 @@ def modified_duration(mac_dur, ytm):
  
  
 def dv01(mod_dur, price):
-    # bond traders use DV01 not duration it's in dollar terms
+    # DV01 is the dollar change for a 1bp move, easier to act on than duration
    return mod_dur * price / 10000
  
  
 def convexity(cash_flows, times, ytm):
     # duration assumes linear price-yield relationship
-    # it's actually curved convexity corrects for that
+    # the real curve bends, convexity corrects for that
     # matters a lot for large moves like 2022's +300bps
     pv = [cf / (1 + ytm)**t for cf, t in zip(cash_flows, times)]
     price = sum(pv)

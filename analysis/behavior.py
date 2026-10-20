@@ -4,7 +4,7 @@ import pandas as pd
 #  raw returns hide behavioral patterns
 # a PM can have positive returns while being systematically bad
 # at position sizing or holding losers too long
-# these metrics separate skill from luck
+# these look at how trades are sized and held, not just the total return
  
  
 def win_rate(trade_returns):
@@ -41,7 +41,7 @@ def edge_ratio(trade_returns):
  
  
 def expectancy(trade_returns):
-    # expected return per trade the number that actually matters
+    # expected return per trade
     # positive expectancy = viable strategy regardless of win rate
     wr = win_rate(trade_returns)
     aw = avg_winner(trade_returns)
