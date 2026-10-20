@@ -2,8 +2,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
  
-# Economic Factor Rotation Portfolio
-# Each asset earns its place by serving a specific regime
+# the 7 ETFs in the portfolio, picked to cover different market regimes
 REGIME_ROTATION_ASSETS = {
     'VTV':  'recovery_leader',
     'IWM':  'growth_amplifier',
@@ -14,7 +13,7 @@ REGIME_ROTATION_ASSETS = {
     'GLD':  'stagflation_store'
 }
  
-# Pulled separately regime detection inputs, not portfolio assets
+# pulled separately: inputs for regime detection, not portfolio assets
 MACRO_SIGNALS = ['^VIX', 'SPY', '^TNX']
  
  
@@ -50,5 +49,5 @@ if __name__ == '__main__':
     px, ret, lret = fetch_assets()
     vix, spy, tny = fetch_macro()
     print(f"Assets loaded: {px.shape}")
-    print(f"Date range: {px.index[0].date()} → {px.index[-1].date()}")
+    print(f"Date range: {px.index[0].date()} to {px.index[-1].date()}")
     print(f"Missing values: {px.isnull().sum().sum()}")
