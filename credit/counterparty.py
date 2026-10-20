@@ -41,7 +41,7 @@ def leverage_metrics(gross_exposure, nav, maintenance_margin=0.25):
  
 def counterparty_scorecard(fund):
     # four dimensions: performance quality, downside risk, leverage, size
-    # first-pass credit screening not a full credit analysis
+    # a first pass screen, not a full credit analysis
     score = 0
  
     if   fund['sharpe']      >  1.5: score += 25
