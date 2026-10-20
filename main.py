@@ -1,10 +1,7 @@
-# APEX Adaptive Portfolio Exposure and Risk Engine
+# APEX: Adaptive Portfolio Exposure and Risk Engine
 #
-# core idea: unconditional risk metrics lie.
-# a portfolio's VaR in a bull market tells you nothing
-# about what happens when the regime shifts.
-# built this to see if conditioning on regime state
-# actually changes the numbers meaningfully. it does.
+# question: does the same portfolio's risk (VaR, Sharpe) change
+# depending on the market regime? runs every module in order.
 
 import numpy as np
 import warnings
